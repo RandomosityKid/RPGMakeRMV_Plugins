@@ -194,6 +194,14 @@
  * @type boolean
  * @default true
  * @desc Award exp even on recipe failure? (requires CGMV Professions)
+ *
+ * @param Failed Percentage
+ * @parent Other CGMV Plugin Options
+ * @type number
+ * @min 0
+ * @max 100
+ * @default 25
+ * @desc Percentage of exp to award on failure
 */
 /*~struct~Recipe:
  * @param Products
@@ -333,6 +341,7 @@ CGMV.Crafting.SuccessColor = Number(CGMV.Crafting.parameters["Success Color"]) |
 CGMV.Crafting.ShowLearnToast = (CGMV.Crafting.parameters["Show Learn Toast"] === "true") ? true : false;
 CGMV.Crafting.ToastText = CGMV.Crafting.parameters["Toast Text"] || "Learned Recipe: ";
 CGMV.Crafting.AlwaysAwardExp = (CGMV.Crafting.parameters["Always Award Exp"] === "true") ? true : false;
+CGMV.Crafting.DeductionPercentage = Number(CGMV.Crafting.parameters["Failed Percentage"] || 25);
 //=============================================================================
 // CGMV_Recipe
 //-----------------------------------------------------------------------------
@@ -481,8 +490,23 @@ CGMV_Recipe.prototype.learn = function() {
 // Award profession Exp if applicable
 //-----------------------------------------------------------------------------
 CGMV_Recipe.prototype.awardExp = function(success) {
+	var expToAward = this._experience;
+	
+	if (!success && CGMV.Crafting.AlwaysAwardExp){
+		//Calculate reduced amount based on deduction parameter 
+		expToAward = Math.floor(this._experience * (CGMV.Crafting.DeductionPercentage / 100));
+	}
+	
 	if(success || CGMV.Crafting.AlwaysAwardExp) {
-		$cgmv.changeProfessionExp(this._profession, "+", this._experience);
+		$cgmv.changeProfessionExp(this._profession, "+", expToAward);
+	}
+	
+	if (success || CGMV.Crafting.AlwaysAwardExp){
+		var disciplineIndex = YR.ItemCraft.discs.findIndex(discipline => discipline.discName === this._profession);
+		if (disciplineIndex !== -1) {
+			// Use disciplineIndex + 1 because increaseDiscExp expects a 1-based index
+			$gameParty.increaseDiscExp(disciplineIndex + 1, expToAward);
+		}
 	}
 };
 //=============================================================================
